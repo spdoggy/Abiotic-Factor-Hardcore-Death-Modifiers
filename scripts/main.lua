@@ -24,12 +24,13 @@ local Config = require("../config")
 ModName = "Hardcore-Modifiers"
 ModVersion = "1.0.0"
 DebugMode = false
+LogFilePath = "./ue4ss/Mods/Abiotic-Factor-Hardcore-Death-Modifiers/death_note.lua"
 
 Utils.log("Starting Hardcore-Modifiers mod initialization")
 
 
 local function WriteDeathNote(death_table)
-    local death_notes,err = io.open("./ue4ss/Mods/death_note.lua","w")
+    local death_notes,err = io.open(LogFilePath,"w")
     if death_notes then
         death_notes:write("return {\n")
         for key, value in pairs(death_table) do
@@ -42,7 +43,7 @@ local function WriteDeathNote(death_table)
 end
 
 local function CheckDeathNoteExists()
-    local f=io.open("./ue4ss/Mods/death_note.lua","r")
+    local f=io.open(LogFilePath,"r")
     if f ~= nil then
         io.close(f)
         return true
