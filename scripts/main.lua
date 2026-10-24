@@ -127,17 +127,11 @@ local function PlayerApplyAmnesia(player_name)
     local player_prog = player.CharacterProgressionComponent
     if Utils.IsValid(player) and Utils.IsValid(player_prog) then
 
-        local save_skills = {}
-        player_prog.CharacterSkills_Values:ForEach(function(index, value)
-            save_skills[index] = value:get().CurrentSkillXP_20_8F7934CD4A4542F036AE5C9649362556
-        end)
-
         local amnesia_threshold = true
         player_prog:Request_ResetAllSkills(amnesia_threshold)
         local success = {}
         for i = 1, 16, 1 do
-            local restore_xp = math.min(Config.reset_xp, save_skills[i])
-            player_prog:Server_AddXPToSkill(i, 940, true, success)
+            player_prog:Server_AddXPToSkill(i, Config.reset_xp, true, success)
         end
     end
 end
@@ -207,64 +201,9 @@ end)
 if ToggleKey and ToggleKeyModifiers then
     local function SetModState(Enable)
         ExecuteInGameThread(function()
+
             -- test stuff here
             local world = Utils.GetWorld()
-            
-            local player = Utils.GetPlayerFromName("SpDoggy")
-            local player_prog = player.CharacterProgressionComponent
-            if Utils.IsValid(player) and Utils.IsValid(player_prog) then
-
-                local save_skills = {}
-
-                PlayerSetSkillDebug("SpDoggy", 300)
-
-                print(player_prog.CharacterSkills_Values[16].CurrentSkillXP_20_8F7934CD4A4542F036AE5C9649362556)
-                
-                player_prog.CharacterSkills_Values:ForEach(function(index, value)
-                    print(index)
-                    --print(player_prog.CharacterSkills_Values[i].CurrentSkillXP_20_8F7934CD4A4542F036AE5C9649362556)
-                    print(value:get().SkillName_12_151AF436411AC221F1B7A295B82A483E:ToString())
-                    print(value:get().CurrentSkillXP_20_8F7934CD4A4542F036AE5C9649362556)
-
-                    --save_skills[i] = player_prog.CharacterSkills_Values[i].CurrentSkillXP_20_8F7934CD4A4542F036AE5C9649362556
-                    --print(save_skills[i])
-                end)
-
-                --GetCurrentSkillLevel(TEnumAsByte<E_CharacterSkills::Type> Skill, bool IgnoreStats, int32& Level, double& XPToNextLevel, double& NextLevelXP, double& LastLevelXP, bool& max, double& CurrentXP, double& CurrentXPMultiplier);
-                local level = {}
-                local xp_to_next_level = {}
-                local next_level_xp = {}
-                local last_level_xp = {}
-                local max = {}
-                local current_xp = {}
-                local current_xp_mult = {}
-                player_prog:GetCurrentSkillLevel(2, true, level, xp_to_next_level, next_level_xp, last_level_xp, max, current_xp, current_xp_mult)
-                print("current_xp")
-                print(current_xp)
-                print(current_xp == nil)
-                print(current_xp[0])
-                print(current_xp[1])
-                -- for key, value in pairs(current_xp) do
-                --     print(key)
-                --     print(":")
-                --     print(value)
-                -- end
-                -- print(save_skills[15])
-                -- print(save_skills[16])
-
-                -- local amnesia_threshold = true
-                -- player_prog:Request_ResetAllSkills(amnesia_threshold)
-                -- local success = {}
-                -- for i = 1, 16, 1 do
-                --     local restore_xp = Config.reset_xp
-                --     if save_skills[i] ~= nil then
-                --         restore_xp = math.min(Config.reset_xp, save_skills[i])
-                --     end
-                --     player_prog:Server_AddXPToSkill(i, restore_xp, true, success)
-                -- end
-
-
-            end
 
         end)
     end

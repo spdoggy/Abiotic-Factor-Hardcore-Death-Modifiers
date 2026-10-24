@@ -4,7 +4,7 @@ return {
     -- Enable debug log.
     Debug = true,
     extra_lives = 3,
-    reset_xp = 940,
+    reset_xp = 200,
     -- XP Ref Chart:
     -- ==============
     -- Lvl | XP_Req
