@@ -39,14 +39,16 @@ local function IsPlayerInDeathLog(player_name)
 end
 
 local function WriteDeathNote(death_table)
-    local death_notes,err = io.open("./ue4ss/Mods/AbioticFactor-HardcoreModifiers/death_note.lua","w")
-    death_notes:write("return {\n")
-    for key, value in pairs(death_table) do
-        local line = string.format("    %s = %s,\n", key, value)
-        death_notes:write(line)
+    local death_notes,err = io.open("./ue4ss/Mods/Abiotic-Factor-Hardcore-Death-Modifiers/death_note.lua","w")
+    if death_notes then
+        death_notes:write("return {\n")
+        for key, value in pairs(death_table) do
+            local line = string.format("    %s = %s,\n", key, value)
+            death_notes:write(line)
+        end
+        death_notes:write("}\n")
+        death_notes:close()
     end
-    death_notes:write("}\n")
-    death_notes:close()
 end
 
 local function LogPlayerDeath(player_name)
@@ -127,15 +129,41 @@ local function PlayerSetSkillDebug(player_name)
     end
 end
 
+local function RespawnFromHardcoreDeath(player, player_state)
+
+    -- TODO: Make this detect and work in Hardcore mode.
+    -- player_state:AdminReviveFromHardcoreDeath()
+    local success = {}
+
+    -- void AdminReviveFromHardcoreDeath();
+    ExecuteWithDelay(1000, function()
+        player:RespawnPlayerCharacter(false, false, FName("sector_office"), success);
+    end)
+
+    ExecuteWithDelay(1100, function()
+        local cafeteria_location = {X = -15314, Y = 12532, Z = 128}
+        local cafeteria_rotation = {Pitch = 0.0, Yaw = 359.0, Roll = 0.0}
+        --player:TeleportPlayer(cafeteria_location, cafeteria_rotation, true, false, false, false)
+        player:K2_TeleportTo(cafeteria_location, cafeteria_rotation)
+    end)
+end
+
+
 local function Handle_OnRep_IsDead(context)
     local player = context:Get()
     local world = Utils.GetWorld()
-    if Utils.IsValid(player) then
+    if Utils.IsValid(player) and Utils.IsValid(player.MyPlayerState) then
         local player_name = player.MyPlayerState:GetPlayerName():ToString()
         local player_state = player.MyPlayerState
+        
         -- Handle_OnRep_IsDead may be called again on respawn, double-check
         if player.IsDead then
             LogPlayerDeath(player_name)
+            if PlayerHasLivesLeft(player_name) then
+                if player_state.IsHardcoreDead then
+                    RespawnFromHardcoreDeath(player, player_state)
+                end
+            end
         else
             DisplayPlayerLivesRemaining(player_name)
             if not PlayerHasLivesLeft(player_name) then
@@ -183,18 +211,24 @@ if ToggleKey and ToggleKeyModifiers then
             -- PlayerSetSkillDebug(player_name)
             local player = Utils.GetPlayerFromName(player_name)
             local player_state = player.MyPlayerState
-            local is_hardcore_dead = player_state.IsHardcoreDead
-            print("IsHardcoreDead")
+
+            -- local is_hardcore_dead = player_state.IsHardcoreDead
+            -- print("IsHardcoreDead")
+            -- print(player_state.IsHardcoreDead)
+            
             if player_state.IsHardcoreDead then
                 -- TODO: Make this detect and work in Hardcore mode.
                 -- player_state:AdminReviveFromHardcoreDeath()
                 local success = {}
-                player:RespawnPlayerCharacter(false, false, FName("Cafeteria"), success);
-                
-            end
-            print()
 
-            -- void AdminReviveFromHardcoreDeath();
+                -- -- void AdminReviveFromHardcoreDeath();
+                -- player:RespawnPlayerCharacter(false, false, FName("sector_office"), success);
+
+                -- local cafeteria_location = {X = -15314, Y = 12532, Z = 128}
+                -- local cafeteria_rotation = {Pitch = 0.0, Yaw = 359.0, Roll = 0.0}
+                -- --player:TeleportPlayer(cafeteria_location, cafeteria_rotation, true, false, false, false)
+                -- player:K2_TeleportTo(cafeteria_location, cafeteria_rotation)
+            end
         end)
     end
 
