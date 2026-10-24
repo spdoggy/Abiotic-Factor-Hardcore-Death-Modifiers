@@ -28,16 +28,6 @@ DebugMode = false
 Utils.log("Starting Hardcore-Modifiers mod initialization")
 
 
-local function IsPlayerInDeathLog(player_name)
-    local temp_log = require("../death_note")
-    for key, value in pairs(temp_log) do
-        if player_name == key then
-            return true
-        end
-    end
-    return false
-end
-
 local function WriteDeathNote(death_table)
     local death_notes,err = io.open("./ue4ss/Mods/death_note.lua","w")
     if death_notes then
@@ -51,7 +41,34 @@ local function WriteDeathNote(death_table)
     end
 end
 
+local function CheckDeathNoteExists()
+    local f=io.open("./ue4ss/Mods/death_note.lua","r")
+    if f ~= nil then
+        io.close(f)
+        return true
+    else
+        init_table = {
+            Player1 = 4,
+            Player2 = 0,
+        }
+        WriteDeathNote(init_table)
+        return false
+    end
+end
+
+local function IsPlayerInDeathLog(player_name)
+    CheckDeathNoteExists()
+    local temp_log = require("../death_note")
+    for key, value in pairs(temp_log) do
+        if player_name == key then
+            return true
+        end
+    end
+    return false
+end
+
 local function LogPlayerDeath(player_name)
+    CheckDeathNoteExists()
     local death_note = require("../death_note")
     if IsPlayerInDeathLog(player_name) then
         death_note[player_name] = death_note[player_name] + 1
@@ -62,12 +79,14 @@ local function LogPlayerDeath(player_name)
 end
 
 local function ResetPlayerLives(player_name)
+    CheckDeathNoteExists()
     local death_note = require("../death_note")
     death_note[player_name] = 0
     WriteDeathNote(death_note)
 end
 
 local function GetNumPlayerDeaths(player_name)
+    CheckDeathNoteExists()
     local death_log = require("../death_note")
     if IsPlayerInDeathLog(player_name) then
         return death_log[player_name]
