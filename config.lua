@@ -3,7 +3,20 @@ return {
     -- [Debug] ============================================
     -- Enable debug log.
     Debug = true,
+
+    -- [Hardcore Perma Death Setting] =====================
+    -- True =  Hardcore Players will be respawned in the
+    --         Cafeteria always, regardless of # of remaining extra lives
+    -- False = Hardcore Players will be permanently dead after exhausting
+    --         all extra lives
+    no_hardcore_perma_death = true,
+
+    -- [Player Extra Lives]
+    -- Number of Extra Lives before XP Loss Penalty
     extra_lives = 3,
+
+    -- [XP Loss Settings] =====================
+    -- XP Level for All Skills on Loss of all Lives
     reset_xp = 200,
     -- XP Ref Chart:
     -- ==============

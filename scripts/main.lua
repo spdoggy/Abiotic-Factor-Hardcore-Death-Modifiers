@@ -152,6 +152,27 @@ local function PlayerSetSkillDebug(player_name, xp)
     end
 end
 
+local function RespawnFromHardcoreDeath(player, player_state)
+
+    -- TODO: Make this detect and work in Hardcore mode.
+    -- player_state:AdminReviveFromHardcoreDeath()
+    local success = {}
+
+    -- void AdminReviveFromHardcoreDeath();
+    ExecuteWithDelay(1000, function()
+        -- TODO: Both of these needed?
+        player:RespawnPlayerCharacter(false, false, FName("sector_office"), success)
+        player_state:AdminReviveFromHardcoreDeath()
+    end)
+
+    ExecuteWithDelay(1100, function()
+        local cafeteria_location = {X = -15314, Y = 12532, Z = 128}
+        local cafeteria_rotation = {Pitch = 0.0, Yaw = 359.0, Roll = 0.0}
+        --player:TeleportPlayer(cafeteria_location, cafeteria_rotation, true, false, false, false)
+        player:K2_TeleportTo(cafeteria_location, cafeteria_rotation)
+    end)
+end
+
 local function Handle_OnRep_IsDead(context)
     local player = context:Get()
     local world = Utils.GetWorld()
@@ -162,6 +183,11 @@ local function Handle_OnRep_IsDead(context)
         -- Handle_OnRep_IsDead may be called again on respawn, double-check
         if player.IsDead then
             LogPlayerDeath(player_name)
+            if PlayerHasLivesLeft(player_name) then
+                if player_state.IsHardcoreDead then
+                    RespawnFromHardcoreDeath(player, player_state)
+                end
+            end
         else
             DisplayPlayerLivesRemaining(player_name)
             if not PlayerHasLivesLeft(player_name) then
