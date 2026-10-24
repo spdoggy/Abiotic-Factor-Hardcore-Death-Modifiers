@@ -39,7 +39,7 @@ local function IsPlayerInDeathLog(player_name)
 end
 
 local function WriteDeathNote(death_table)
-    local death_notes,err = io.open("./ue4ss/Mods/Abiotic-Factor-Hardcore-Death-Modifiers/death_note.lua","w")
+    local death_notes,err = io.open("./ue4ss/Mods/death_note.lua","w")
     if death_notes then
         death_notes:write("return {\n")
         for key, value in pairs(death_table) do
@@ -137,7 +137,8 @@ local function RespawnFromHardcoreDeath(player, player_state)
 
     -- void AdminReviveFromHardcoreDeath();
     ExecuteWithDelay(1000, function()
-        player:RespawnPlayerCharacter(false, false, FName("sector_office"), success);
+        --player:RespawnPlayerCharacter(false, false, FName("sector_office"), success)
+        player:AdminReviveFromHardcoreDeath()
     end)
 
     ExecuteWithDelay(1100, function()
@@ -161,7 +162,10 @@ local function Handle_OnRep_IsDead(context)
             LogPlayerDeath(player_name)
             if PlayerHasLivesLeft(player_name) then
                 if player_state.IsHardcoreDead then
+                    player_state.IsHardcoreDead = false
                     RespawnFromHardcoreDeath(player, player_state)
+                else
+                    ResetPlayerLives(player_name)
                 end
             end
         else
