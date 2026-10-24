@@ -129,27 +129,6 @@ local function PlayerSetSkillDebug(player_name)
     end
 end
 
-local function RespawnFromHardcoreDeath(player, player_state)
-
-    -- TODO: Make this detect and work in Hardcore mode.
-    -- player_state:AdminReviveFromHardcoreDeath()
-    local success = {}
-
-    -- void AdminReviveFromHardcoreDeath();
-    ExecuteWithDelay(1000, function()
-        --player:RespawnPlayerCharacter(false, false, FName("sector_office"), success)
-        player:AdminReviveFromHardcoreDeath()
-    end)
-
-    ExecuteWithDelay(1100, function()
-        local cafeteria_location = {X = -15314, Y = 12532, Z = 128}
-        local cafeteria_rotation = {Pitch = 0.0, Yaw = 359.0, Roll = 0.0}
-        --player:TeleportPlayer(cafeteria_location, cafeteria_rotation, true, false, false, false)
-        player:K2_TeleportTo(cafeteria_location, cafeteria_rotation)
-    end)
-end
-
-
 local function Handle_OnRep_IsDead(context)
     local player = context:Get()
     local world = Utils.GetWorld()
@@ -160,14 +139,6 @@ local function Handle_OnRep_IsDead(context)
         -- Handle_OnRep_IsDead may be called again on respawn, double-check
         if player.IsDead then
             LogPlayerDeath(player_name)
-            if PlayerHasLivesLeft(player_name) then
-                if player_state.IsHardcoreDead then
-                    player_state.IsHardcoreDead = false
-                    RespawnFromHardcoreDeath(player, player_state)
-                else
-                    ResetPlayerLives(player_name)
-                end
-            end
         else
             DisplayPlayerLivesRemaining(player_name)
             if not PlayerHasLivesLeft(player_name) then
@@ -210,29 +181,6 @@ if ToggleKey and ToggleKeyModifiers then
         ExecuteInGameThread(function()
             -- test stuff here
             local world = Utils.GetWorld()
-            --DisplayPlayerLivesRemaining("SpDoggy")
-            local player_name = "SpDoggy"
-            -- PlayerSetSkillDebug(player_name)
-            local player = Utils.GetPlayerFromName(player_name)
-            local player_state = player.MyPlayerState
-
-            -- local is_hardcore_dead = player_state.IsHardcoreDead
-            -- print("IsHardcoreDead")
-            -- print(player_state.IsHardcoreDead)
-            
-            if player_state.IsHardcoreDead then
-                -- TODO: Make this detect and work in Hardcore mode.
-                -- player_state:AdminReviveFromHardcoreDeath()
-                local success = {}
-
-                -- -- void AdminReviveFromHardcoreDeath();
-                -- player:RespawnPlayerCharacter(false, false, FName("sector_office"), success);
-
-                -- local cafeteria_location = {X = -15314, Y = 12532, Z = 128}
-                -- local cafeteria_rotation = {Pitch = 0.0, Yaw = 359.0, Roll = 0.0}
-                -- --player:TeleportPlayer(cafeteria_location, cafeteria_rotation, true, false, false, false)
-                -- player:K2_TeleportTo(cafeteria_location, cafeteria_rotation)
-            end
         end)
     end
 
