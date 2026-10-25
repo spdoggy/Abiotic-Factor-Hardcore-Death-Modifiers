@@ -25,7 +25,12 @@ ModName = "Hardcore-Modifiers"
 ModVersion = "1.0.0"
 DebugMode = false
 LogFilePath = "./ue4ss/Mods/Abiotic-Factor-Hardcore-Death-Modifiers/death_note.lua"
-local respawn_flag = {}
+local re_spawned_state = {}
+local SpawnStates = {
+    Alive = "Alive",
+    Dead = "Dead",
+    Reviving = "Reviving",
+}
 
 Utils.log("Starting Hardcore-Modifiers mod initialization")
 
@@ -132,8 +137,13 @@ local function PlayerApplyAmnesia(player_name)
         local amnesia_threshold = true
         player_prog:Request_ResetAllSkills(amnesia_threshold)
         local success = {}
+        local delay = 1000
         for i = 1, 16, 1 do
-            player_prog:Server_AddXPToSkill(i, Config.reset_xp, true, success)
+            ExecuteWithDelay(delay, function()
+                local IgnoreModifiers = true
+                player_prog:Server_AddXPToSkill(i, Config.reset_xp, IgnoreModifiers, success)
+            end)
+            delay = delay + 200
         end
     end
 end
@@ -146,9 +156,12 @@ local function PlayerSetSkillDebug(player_name, xp)
         local amnesia_threshold = true
         player_prog:Request_ResetAllSkills(amnesia_threshold)
         local success = {}
+        local delay = 500
         for i = 1, 16, 1 do
-            player_prog:Server_AddXPToSkill(i, xp, true, success)
-            xp = xp + 10
+            ExecuteWithDelay(delay, function()
+                player_prog:Server_AddXPToSkill(i, xp, true, success)
+                xp = xp + 10
+            end)
         end
     end
 end
@@ -156,6 +169,7 @@ end
 local function RespawnFromHardcoreDeath(player, player_state)
 
     ExecuteInGameThread(function()
+
         local success = {}
         player:RespawnPlayerCharacter(false, false, FName("sector_office"), success)
         player_state:AdminReviveFromHardcoreDeath()
@@ -163,13 +177,13 @@ local function RespawnFromHardcoreDeath(player, player_state)
         local cafeteria_rotation = {Pitch = 0.0, Yaw = 359.0, Roll = 0.0}
         player:K2_TeleportTo(cafeteria_location, cafeteria_rotation)
 
-        -- ExecuteWithDelay(2000, function()
+        -- ExecuteWithDelay(1500, function()
         --     local success = {}
         --     player:RespawnPlayerCharacter(false, false, FName("sector_office"), success)
         --     player_state:AdminReviveFromHardcoreDeath()
         -- end)
 
-        -- ExecuteWithDelay(2100, function()
+        -- ExecuteWithDelay(1600, function()
         --     local cafeteria_location = {X = -15314, Y = 12532, Z = 128}
         --     local cafeteria_rotation = {Pitch = 0.0, Yaw = 359.0, Roll = 0.0}
         --     player:K2_TeleportTo(cafeteria_location, cafeteria_rotation)
@@ -179,49 +193,92 @@ local function RespawnFromHardcoreDeath(player, player_state)
 
 end
 
+local function DetermineDeathState(player)
+    local player_name = player.MyPlayerState:GetPlayerName():ToString()
+    local player_state = player.MyPlayerState
+    local log_msg = string.format("[Handle_OnRep_IsDead]: %s, IsDead: %s, Flag: %s", player_name, player.IsDead, re_spawned_state[player_name])
+    Utils.log(log_msg)
+
+    -- Handle_OnRep_IsDead may be called again on respawn, double-check
+
+    -- First Death, No Log Entry -> Reviving
+    if re_spawned_state[player_name] == nil and player.IsDead then
+        re_spawned_state[player_name] = SpawnStates.Reviving
+        LogPlayerDeath(player_name)
+        if PlayerHasLivesLeft(player_name) or Config.no_hardcore_perma_death then
+            if player_state.IsHardcoreDead then
+                RespawnFromHardcoreDeath(player, player_state)
+            end
+        end
+    -- Death, Existing Log Entry in Session Memory -> Reviving
+    elseif re_spawned_state[player_name] == SpawnStates.Alive and player.IsDead then
+        LogPlayerDeath(player_name)
+        re_spawned_state[player_name] = SpawnStates.Reviving
+        if PlayerHasLivesLeft(player_name) or Config.no_hardcore_perma_death then
+            if player_state.IsHardcoreDead then
+                RespawnFromHardcoreDeath(player, player_state)
+            end
+        end
+    -- Reviving -> Reviving (No change)
+    elseif player.IsDead and re_spawned_state[player_name] == SpawnStates.Reviving then
+        -- Re-Entrance, do not increment
+        -- [TODO]: Understand why this is needed
+        -- Without: Bounces between IsDead True/False, even using ExecuteInGameThread??
+        -- [2026-10-25 01:46:48.0092247] [Lua] [Handle_OnRep_IsDead]: SpDoggy, IsDead: true, Flag: nil[2026-10-25 01:46:48.0092247] [Lua] 
+        -- [2026-10-25 01:46:48.0412250] [Lua] [Handle_OnRep_IsDead]: SpDoggy, IsDead: false, Flag: Reviving[2026-10-25 01:46:48.0422250] [Lua] 
+        -- [2026-10-25 01:46:48.0442250] [Lua] [Handle_OnRep_IsDead]: SpDoggy, IsDead: true, Flag: nil[2026-10-25 01:46:48.0442250] [Lua] 
+        -- [2026-10-25 01:46:48.0472250] [Lua] [Handle_OnRep_IsDead]: SpDoggy, IsDead: false, Flag: Reviving[2026-10-25 01:46:48.0472250] [Lua] 
+        -- [2026-10-25 01:46:48.0492250] [Lua] [Handle_OnRep_IsDead]: SpDoggy, IsDead: true, Flag: nil[2026-10-25 01:46:48.0492250] [Lua] 
+        -- [2026-10-25 01:46:48.0752253] [Lua] [Handle_OnRep_IsDead]: SpDoggy, IsDead: false, Flag: Reviving[2026-10-25 01:46:48.0752253] [Lua] 
+
+        -- With: Successfully revives, why? Too many cycles for the player to actually revive? Have to force it every time during this period?
+        -- [2026-10-25 01:57:24.9549229] [Lua] [Handle_OnRep_IsDead]: SpDoggy, IsDead: true, Flag: nil[2026-10-25 01:57:24.9549229] [Lua] 
+        -- [2026-10-25 01:57:25.0219235] [Lua] [Handle_OnRep_IsDead]: SpDoggy, IsDead: true, Flag: Reviving[2026-10-25 01:57:25.0219235] [Lua] 
+        -- [2026-10-25 01:57:25.0219235] [Lua] [Handle_OnRep_IsDead]: SpDoggy, IsDead: true, Flag: Reviving[2026-10-25 01:57:25.0219235] [Lua] 
+        -- [2026-10-25 01:57:25.0219235] [Lua] [Handle_OnRep_IsDead]: SpDoggy, IsDead: true, Flag: Reviving[2026-10-25 01:57:25.0219235] [Lua] 
+        -- [2026-10-25 01:57:25.0219235] [Lua] [Handle_OnRep_IsDead]: SpDoggy, IsDead: true, Flag: Reviving[2026-10-25 01:57:25.0219235] [Lua] 
+        -- [2026-10-25 01:57:25.0879241] [Lua] [Handle_OnRep_IsDead]: SpDoggy, IsDead: false, Flag: Reviving[2026-10-25 01:57:25.0879241] [Lua] 
+        -- [2026-10-25 01:57:40.0920580] [Lua] [Handle_OnRep_IsDead]: Lockout Expired: SpDoggy, IsDead: false, Flag: Alive[2026-10-25 01:57:40.0920580] [Lua] 
+        if PlayerHasLivesLeft(player_name) or Config.no_hardcore_perma_death then
+            if player_state.IsHardcoreDead then
+                RespawnFromHardcoreDeath(player, player_state)
+            end
+        end
+    -- Reviving -> Alive
+    elseif not player.IsDead and re_spawned_state[player_name] == SpawnStates.Reviving then
+        re_spawned_state[player_name] = SpawnStates.Amnesia
+        DisplayPlayerLivesRemaining(player_name)
+        if not PlayerHasLivesLeft(player_name) then
+            ExecuteWithDelay(5000, function()
+                PlayerApplyAmnesia(player_name)
+            end)
+            ExecuteWithDelay(10000, function()
+                ResetPlayerLives(player_name)
+                DisplayPlayerLivesRemaining(player_name)
+            end)
+        else
+            DisplayPlayerLivesRemaining(player_name)
+        end
+
+        -- Lockout delay before processing further Handle_OnRep_IsDead hooks 
+        ExecuteWithDelay(15000, function()
+            re_spawned_state[player_name] = SpawnStates.Alive
+            local log_msg = string.format("[Handle_OnRep_IsDead]: Lockout Expired: %s, IsDead: %s, Flag: %s", player_name, player.IsDead, re_spawned_state[player_name])
+            Utils.log(log_msg)
+        end)
+
+    elseif player.IsDead then
+        Utils.error("[Handle_OnRep_IsDead]:Invalid State Machine")
+    end
+end
+
 local function Handle_OnRep_IsDead(context)
     local player = context:Get()
     local world = Utils.GetWorld()
     if Utils.IsValid(player) and Utils.IsValid(player.MyPlayerState) then
-        local player_name = player.MyPlayerState:GetPlayerName():ToString()
-        local player_state = player.MyPlayerState
-        local log_msg = string.format("[Handle_OnRep_IsDead]: %s, IsDead: %s, Flag: %s", player_name, player.IsDead, respawn_flag[player_name])
-        Utils.log(log_msg)
-
-        -- Handle_OnRep_IsDead may be called again on respawn, double-check
-        if player.IsDead and respawn_flag[player_name] then
-            -- Re-Entrance, do not increment
-            if PlayerHasLivesLeft(player_name) then
-                if player_state.IsHardcoreDead then
-                    RespawnFromHardcoreDeath(player, player_state)
-                end
-            end
-        elseif player.IsDead then
-            LogPlayerDeath(player_name)
-            respawn_flag[player_name] = true
-            if PlayerHasLivesLeft(player_name) then
-                if player_state.IsHardcoreDead then
-                    RespawnFromHardcoreDeath(player, player_state)
-                end
-            end
-            -- Temp Lockout
-            ExecuteWithDelay(10000, function()
-                respawn_flag[player_name] = false
-            end)
-        else
-            DisplayPlayerLivesRemaining(player_name)
-            if not PlayerHasLivesLeft(player_name) then
-                ExecuteWithDelay(5000, function()
-                    PlayerApplyAmnesia(player_name)
-                end)
-                ExecuteWithDelay(10000, function()
-                    ResetPlayerLives(player_name)
-                    DisplayPlayerLivesRemaining(player_name)
-                end)
-            else
-                DisplayPlayerLivesRemaining(player_name)
-            end
-        end
+        ExecuteInGameThread(function()
+            DetermineDeathState(player)
+        end)
     end
 end
 
