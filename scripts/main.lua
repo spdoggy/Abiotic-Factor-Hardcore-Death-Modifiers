@@ -25,6 +25,7 @@ ModName = "Hardcore-Modifiers"
 ModVersion = "1.0.0"
 DebugMode = false
 LogFilePath = "./ue4ss/Mods/Abiotic-Factor-Hardcore-Death-Modifiers/death_note.lua"
+local respawn_flag = {}
 
 Utils.log("Starting Hardcore-Modifiers mod initialization")
 
@@ -106,7 +107,7 @@ local function DisplayPlayerLivesRemaining(player_name)
     if Utils.IsValid(player) then
         local death_count = GetNumPlayerDeaths(player_name)
         local lives_remaining = math.max(Config.extra_lives - death_count, 0)
-        local msg = string.format("Player %s: %d extra lives left!", player_name, lives_remaining)
+        local msg = string.format("Player %s: %d lives left!", player_name, lives_remaining)
         local color = Enums.ClientWarnMessageColors.Green
         if lives_remaining == 1 then
             color= Enums.ClientWarnMessageColors.Yellow
@@ -154,23 +155,28 @@ end
 
 local function RespawnFromHardcoreDeath(player, player_state)
 
-    -- TODO: Make this detect and work in Hardcore mode.
-    -- player_state:AdminReviveFromHardcoreDeath()
-    local success = {}
-
-    -- void AdminReviveFromHardcoreDeath();
-    ExecuteWithDelay(1000, function()
-        -- TODO: Both of these needed?
+    ExecuteInGameThread(function()
+        local success = {}
         player:RespawnPlayerCharacter(false, false, FName("sector_office"), success)
         player_state:AdminReviveFromHardcoreDeath()
-    end)
-
-    ExecuteWithDelay(1100, function()
         local cafeteria_location = {X = -15314, Y = 12532, Z = 128}
         local cafeteria_rotation = {Pitch = 0.0, Yaw = 359.0, Roll = 0.0}
-        --player:TeleportPlayer(cafeteria_location, cafeteria_rotation, true, false, false, false)
         player:K2_TeleportTo(cafeteria_location, cafeteria_rotation)
+
+        -- ExecuteWithDelay(2000, function()
+        --     local success = {}
+        --     player:RespawnPlayerCharacter(false, false, FName("sector_office"), success)
+        --     player_state:AdminReviveFromHardcoreDeath()
+        -- end)
+
+        -- ExecuteWithDelay(2100, function()
+        --     local cafeteria_location = {X = -15314, Y = 12532, Z = 128}
+        --     local cafeteria_rotation = {Pitch = 0.0, Yaw = 359.0, Roll = 0.0}
+        --     player:K2_TeleportTo(cafeteria_location, cafeteria_rotation)
+        -- end)
+
     end)
+
 end
 
 local function Handle_OnRep_IsDead(context)
@@ -179,15 +185,29 @@ local function Handle_OnRep_IsDead(context)
     if Utils.IsValid(player) and Utils.IsValid(player.MyPlayerState) then
         local player_name = player.MyPlayerState:GetPlayerName():ToString()
         local player_state = player.MyPlayerState
+        local log_msg = string.format("[Handle_OnRep_IsDead]: %s, IsDead: %s, Flag: %s", player_name, player.IsDead, respawn_flag[player_name])
+        Utils.log(log_msg)
 
         -- Handle_OnRep_IsDead may be called again on respawn, double-check
-        if player.IsDead then
-            LogPlayerDeath(player_name)
+        if player.IsDead and respawn_flag[player_name] then
+            -- Re-Entrance, do not increment
             if PlayerHasLivesLeft(player_name) then
                 if player_state.IsHardcoreDead then
                     RespawnFromHardcoreDeath(player, player_state)
                 end
             end
+        elseif player.IsDead then
+            LogPlayerDeath(player_name)
+            respawn_flag[player_name] = true
+            if PlayerHasLivesLeft(player_name) then
+                if player_state.IsHardcoreDead then
+                    RespawnFromHardcoreDeath(player, player_state)
+                end
+            end
+            -- Temp Lockout
+            ExecuteWithDelay(10000, function()
+                respawn_flag[player_name] = false
+            end)
         else
             DisplayPlayerLivesRemaining(player_name)
             if not PlayerHasLivesLeft(player_name) then
