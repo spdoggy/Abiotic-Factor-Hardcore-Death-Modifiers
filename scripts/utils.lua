@@ -31,12 +31,6 @@ local WeatherEventLibCache = CreateInvalidObject() ---@cast WeatherEventLibCache
 local buffHandleFuncLibCache = CreateInvalidObject() ---@cast buffHandleFuncLibCache UBuffDebuffHandleFunctionLibrary
 local sound_has_finished = true
 
-local PROP_ITEM_DATA_TABLE = "ItemDataTable_18_BF1052F141F66A976F4844AB2B13062B" -- cooked GUID slot fields; first to break on a game update
-local PROP_CHANGEABLE_DATA = "ChangeableData_12_2B90E1F74F648135579D39A49F5A2313"
-local PROP_CUR_DURABILITY  = "CurrentItemDurability_4_24B4D0E64E496B43FB8D3CA2B9D161C8"
-local PROP_MAX_DURABILITY  = "MaxItemDurability_6_F5D5F0D64D4D6050CCCDE4869785012B"
-local PROP_CUR_STACK       = "CurrentStack_9_D443B69044D640B0989FD8A629801A49"
-
 -- ============================================================
 -- UTILITIES
 -- ============================================================
@@ -784,7 +778,7 @@ local function FindEmptySlot(inventory)
         local slot = inventory.CurrentInventory[i]
 
         if (slot) then
-            local rowName = slot[PROP_ITEM_DATA_TABLE].RowName:ToString()
+            local rowName = slot.ItemDataTable.RowName:ToString()
 
             if (rowName == "None" or rowName == "Empty" or rowName == "") then
                 return i
@@ -818,12 +812,11 @@ function Utils.GiveItemToTarget(pawn, name, itemId, item_table, item_cat, quanti
 
     local slot = inventory.CurrentInventory[slotIndex]
 
-    slot[PROP_ITEM_DATA_TABLE].DataTable = dataTable
-    slot[PROP_ITEM_DATA_TABLE].RowName = FName(itemId)
 
-    slot[PROP_CHANGEABLE_DATA][PROP_CUR_DURABILITY] = 100.0
-    slot[PROP_CHANGEABLE_DATA][PROP_MAX_DURABILITY] = 100.0
-    slot[PROP_CHANGEABLE_DATA][PROP_CUR_STACK] = quantity
+    slot.ItemDataTable.RowName = FName(itemId)
+    slot.ChangeableData.CurrentItemDurability = 100
+    slot.ChangeableData.MaxItemDurability = 100
+    slot.ChangeableData.CurrentStack = quantity
 
     pcall(function()
         inventory:OnRep_CurrentInventory()
