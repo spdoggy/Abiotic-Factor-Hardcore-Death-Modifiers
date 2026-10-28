@@ -13,7 +13,7 @@ ModEnabled = true
 -- See ModifierKey: https://github.com/UE4SS-RE/RE-UE4SS/blob/main/docs/lua-api/table-definitions/modifierkey.md
 -- ModifierKeys can be combined. e.g.: {ModifierKey.CONTROL, ModifierKey.ALT} = CTRL + ALT + Q
 -- Set to `nil` to disable hotkey.
-ToggleKey = Key.F5
+ToggleKey = Key.F6
 ToggleKeyModifiers = {ModifierKey.CONTROL}
 ------------------------------------
 local Utils = require("utils")
@@ -30,6 +30,8 @@ local SpawnStates = {
     Alive = "Alive",
     Dead = "Dead",
     Amnesia = "Amnesia",
+    Reset = "Reset",
+    Display = "Display",
     Reviving = "Reviving",
 }
 
@@ -135,17 +137,19 @@ local function PlayerApplyAmnesia(player_name)
     local player_prog = player.CharacterProgressionComponent
     if Utils.IsValid(player) and Utils.IsValid(player_prog) then
 
+        -- Reset, Combination of Amnesia and writing CurrentXP
         local amnesia_threshold = true
         player_prog:Request_ResetAllSkills(amnesia_threshold)
-        local success = {}
-        local delay = 1000
-        for i = 1, 16, 1 do
-            ExecuteWithDelay(delay, function()
-                local IgnoreModifiers = true
-                player_prog:Server_AddXPToSkill(i, Config.reset_xp, IgnoreModifiers, success)
-            end)
-            delay = delay + 200
+        for i = 1, 17, 1 do
+            player_prog.CharacterSkills_Values[i].CurrentXP = 0
         end
+        player_prog:OnRep_CharacterSkills_Values()
+
+        -- Restore Only to Config.reset_xp
+        for i = 1, 17, 1 do
+            player_prog.CharacterSkills_Values[i].CurrentXP = Config.reset_xp
+        end
+
     end
 end
 
@@ -192,6 +196,11 @@ local function RespawnFromHardcoreDeath(player, player_state)
 
     end)
 
+end
+
+local function LogStateMachine(player_name, player)
+    local log_msg = string.format("[Handle_OnRep_IsDead]: %s, IsDead: %s, Flag: %s", player_name, player.IsDead, re_spawned_state[player_name])
+    Utils.log(log_msg)
 end
 
 local function DetermineDeathState(player)
@@ -249,13 +258,24 @@ local function DetermineDeathState(player)
     elseif not player.IsDead and re_spawned_state[player_name] == SpawnStates.Reviving then
         re_spawned_state[player_name] = SpawnStates.Amnesia
         DisplayPlayerLivesRemaining(player_name)
-        if not PlayerHasLivesLeft(player_name) then
+        if not PlayerHasLivesLeft(player_name) and re_spawned_state[player_name] == SpawnStates.Amnesia then
             ExecuteWithDelay(5000, function()
-                PlayerApplyAmnesia(player_name)
+                -- Amnesia -> Reset
+                LogStateMachine(player_name, player)
+                if re_spawned_state[player_name] == SpawnStates.Amnesia then
+                    PlayerApplyAmnesia(player_name)
+                    re_spawned_state[player_name] = SpawnStates.Reset
+                end
             end)
             ExecuteWithDelay(10000, function()
-                ResetPlayerLives(player_name)
-                DisplayPlayerLivesRemaining(player_name)
+                -- Reset -> Display
+                if re_spawned_state[player_name] == SpawnStates.Reset then
+                    LogStateMachine(player_name, player)
+                    re_spawned_state[player_name] = SpawnStates.Display
+                    ResetPlayerLives(player_name)
+                    DisplayPlayerLivesRemaining(player_name)
+                    LogStateMachine(player_name, player)
+                end
             end)
         else
             DisplayPlayerLivesRemaining(player_name)
@@ -264,11 +284,13 @@ local function DetermineDeathState(player)
         -- Lockout delay before processing further Handle_OnRep_IsDead hooks 
         ExecuteWithDelay(15000, function()
             re_spawned_state[player_name] = SpawnStates.Alive
+            LogStateMachine(player_name, player)
             local log_msg = string.format("[Handle_OnRep_IsDead]: Lockout Expired: %s, IsDead: %s, Flag: %s", player_name, player.IsDead, re_spawned_state[player_name])
             Utils.log(log_msg)
         end)
 
     elseif player.IsDead then
+        LogStateMachine(player_name, player)
         Utils.error("[Handle_OnRep_IsDead]:Invalid State Machine")
     end
 end
