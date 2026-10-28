@@ -29,6 +29,7 @@ local re_spawned_state = {}
 local SpawnStates = {
     Alive = "Alive",
     Dead = "Dead",
+    Amnesia = "Amnesia",
     Reviving = "Reviving",
 }
 
